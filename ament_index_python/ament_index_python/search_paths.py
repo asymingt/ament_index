@@ -13,10 +13,10 @@
 # limitations under the License.
 
 import os
+from pathlib import Path
 from typing import List
 
 from .constants import AMENT_PREFIX_PATH_ENV_VAR
-
 
 def get_search_paths() -> List[str]:
     """
@@ -25,8 +25,16 @@ def get_search_paths() -> List[str]:
     :returns: list of paths
     :raises: :exc:`EnvironmentError`
     """.format(AMENT_PREFIX_PATH_ENV_VAR=AMENT_PREFIX_PATH_ENV_VAR)
+
+    # In a Bazel context AMENT_PREFIX_PATH should not be set. If this is the case, then
+    # we need to poke for a MANIFEST file, and use the current work directory as a
+    # stand-in search path for package data.
     ament_prefix_path = os.environ.get(AMENT_PREFIX_PATH_ENV_VAR)
     if not ament_prefix_path:
+        p1 = Path.cwd()
+        p2 = Path("../MANIFEST")
+        if (p1 / p2).is_file():
+            return [p1]
         raise EnvironmentError(
             "Environment variable '{}' is not set or empty".format(AMENT_PREFIX_PATH_ENV_VAR))
 

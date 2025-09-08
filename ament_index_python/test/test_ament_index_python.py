@@ -13,6 +13,8 @@
 # limitations under the License.
 
 import os
+import pytest
+
 from pathlib import Path, PurePath
 
 from ament_index_python import get_package_prefix
@@ -31,19 +33,27 @@ from ament_index_python.cli import main
 from ament_index_python.cli import resource_name_completer
 from ament_index_python.cli import resource_type_completer
 
-import pytest
+from python.runfiles import Runfiles
 
+def get_base_path():
+    try:
+        runfiles = Runfiles.Create()
+        path = runfiles.Rlocation(source_repo="ament_index_python", path="test")
+        if path.is_dir():
+            return Path(path)
+    except:
+        pass
+    return Path(__file__).parent
 
 def set_ament_prefix_path(subfolders):
+    base_path = get_base_path()
     paths = []
-    base_path = Path(__file__).parent
     for subfolder in subfolders:
         path = base_path / subfolder
         if path.is_dir():
             paths.append(str(path))
     ament_prefix_path = os.pathsep.join(paths)
     os.environ['AMENT_PREFIX_PATH'] = ament_prefix_path
-
 
 def test_empty_search_paths():
     set_ament_prefix_path([])
@@ -291,9 +301,9 @@ def test_get_resource_types():
 
 def test_main_tool(capsys):
     set_ament_prefix_path(['prefix1', 'prefix2'])
-    base_path = Path(__file__).parent
+    base_path = get_base_path()
 
-    main()
+    main(argv=[])
     captured = capsys.readouterr()
     expected_result = (
         'packages\n'
