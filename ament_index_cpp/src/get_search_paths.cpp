@@ -15,6 +15,8 @@
 #include "ament_index_cpp/get_search_paths.hpp"
 
 #include <sys/stat.h>
+#include <unistd.h> // For readlink
+#include <limits.h> // For PATH_MAX
 
 #include <cstdlib>
 #include <filesystem>
@@ -50,20 +52,59 @@ std::optional<std::string> get_env_variable(const char * env_var) {
   return std::string(ament_prefix_path);
 }
 
+// Cross-platform way of obtaining the full path to the current executable. Returns
+// std::nullopt if we can't determine the path.
+static std::optional<std::string>
+get_executable_path()
+{
+#if defined(_WIN32)
+  char result[MAX_PATH + 1] = {'\0'};
+  auto path_len = GetModuleFileNameA(NULL, result, MAX_PATH);
+#elif defined(__APPLE__)
+  char result[MAXPATHLEN + 1] = {'\0'};
+  uint32_t path_len = MAXPATHLEN;
+  if (_NSGetExecutablePath(result, &path_len) != 0) {
+    path_len = readlink(result, result, MAXPATHLEN);
+  }
+#else
+  char result[PATH_MAX + 1] = {'\0'};
+  ssize_t path_len = readlink("/proc/self/exe", result, PATH_MAX);
+#endif
+  if (path_len > 0) {
+    return result;
+  }
+  return std::nullopt;
+}
+
 std::list<std::string>
 get_search_paths()
 {
-  // In a Bazel context AMENT_PREFIX_PATH should not be set. If this is the case, then
-  // we need to poke for a MANIFEST file, and use the current work directory as a
-  // stand-in search path for package data.
+  // In a Bazel context AMENT_PREFIX_PATH should not be set.
   std::optional<std::string> ament_prefix_path = get_env_variable("AMENT_PREFIX_PATH");
   if (!ament_prefix_path) {
-    const std::filesystem::path p1 = std::filesystem::current_path();
-    const std::filesystem::path p2 = "../MANIFEST";
-    if (std::filesystem::exists(p1 / p2)) {
-      return std::list<std::string>{p1};
+    
+    // When in a test context both the RUNFILES_DIR and TEST_WORKSPACE environment variables
+    // will be set. So, we can resolve the correct base path for the symlink tree.
+    const std::optional<std::string> runfiles_dir = get_env_variable("RUNFILES_DIR");
+    const std::optional<std::string> test_workspace = get_env_variable("TEST_WORKSPACE");
+    if (runfiles_dir && test_workspace) {
+      return std::list<std::string>{std::filesystem::path(*runfiles_dir) / *test_workspace};
     }
-    throw std::runtime_error("Environment variable 'AMENT_PREFIX_PATH' is not set or empty");
+    
+    // If we get here then we are likely in a run context. In this case there will be no
+    // environment variable. The only clue is the presence of a MANIFEST file at the path
+    // of the executable path plus .runfiles/MANIFEST.
+    const std::optional<std::string> executable_path = get_executable_path();
+    if (executable_path) {
+      const std::filesystem::path runfiles_path(*executable_path + ".runfiles");
+      if (std::filesystem::exists(runfiles_path / "MANIFEST")) {
+        return std::list<std::string>{*executable_path + ".runfiles/_main"};
+      }
+    }
+    
+    // If we get here it means that we don't have an AMENT_PREFIX_PATH and we cant work out
+    // how to construct one from the Bazel context.
+    throw std::runtime_error("Could not calculate AMENT_PREFIX_PATH");
   }
 
   // split at token into separate paths
