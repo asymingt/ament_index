@@ -73,7 +73,9 @@ void set_ament_prefix_path(std::list<std::string> subfolders)
   }
 }
 
-TEST(AmentIndexCpp, empty_search_paths) {
+// NOTE: This test is disabled because AMENT_PREFIX_PATH is always set for a Bazel
+// environment to be the .runfile location for the current executable.
+TEST(AmentIndexCpp, DISABLED_empty_search_paths) {
   std::list<std::string> subfolders;
   set_ament_prefix_path(subfolders);
   EXPECT_THROW(ament_index_cpp::get_search_paths(), std::runtime_error);
