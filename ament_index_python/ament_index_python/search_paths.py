@@ -31,6 +31,10 @@ def get_search_paths() -> List[str]:
     # stand-in search path for package data.
     ament_prefix_path = os.environ.get(AMENT_PREFIX_PATH_ENV_VAR)
     if not ament_prefix_path:
+        runfiles_dir = os.environ.get("RUNFILES_DIR")
+        test_workspace = os.environ.get("TEST_WORKSPACE")
+        if runfiles_dir and test_workspace:
+            return [os.path.join(runfiles_dir, test_workspace)]
         p1 = Path.cwd()
         p2 = Path("../MANIFEST")
         if (p1 / p2).is_file():

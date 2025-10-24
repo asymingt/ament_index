@@ -55,10 +55,13 @@ def set_ament_prefix_path(subfolders):
     ament_prefix_path = os.pathsep.join(paths)
     os.environ['AMENT_PREFIX_PATH'] = ament_prefix_path
 
+# Bazel sets AMENT_PREFIX_PATH automatically when one is not specified.
+# Therefore, these tests may not be run in an environment where the variable
+# is unset. So, we have updated the tests accordingly.
 def test_empty_search_paths():
     set_ament_prefix_path([])
-    with pytest.raises(EnvironmentError):
-        get_search_paths()
+    search_paths = get_search_paths()
+    assert len(search_paths) == 1, 'Expected one search path'
 
 
 def test_search_paths():
@@ -271,9 +274,13 @@ def test_get_package_share_path():
 
 
 def test_get_resource_types():
+
+    # Bazel sets AMENT_PREFIX_PATH automatically when one is not specified.
+    # Therefore, these tests may not be run in an environment where the variable
+    # is unset. So, we have updated the tests accordingly.
     set_ament_prefix_path([])
-    with pytest.raises(EnvironmentError):
-        get_resource_types()
+    resources = get_resource_types()
+    assert len(resources) == 0, 'Expected zero resource types'
 
     set_ament_prefix_path(['prefix1', 'prefix2'])
     resources = get_resource_types()
