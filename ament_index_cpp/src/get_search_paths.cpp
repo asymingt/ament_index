@@ -109,6 +109,14 @@ get_search_paths()
         return std::list<std::string>{*executable_path + ".runfiles/_main"};
       }
     }
+
+    // Python apps built with Bazel typically have a wrapper executable where the 
+    // get_executable_path trick above fails. Fallback to checking if the CWD is
+    // inside a runfiles tree, just like ament_index_python does.
+    const std::filesystem::path cwd = std::filesystem::current_path();
+    if (std::filesystem::exists(cwd / ".." / "MANIFEST")) {
+      return std::list<std::string>{cwd.string()};
+    }
     
     // If we get here it means that we don't have an AMENT_PREFIX_PATH and we cant work out
     // how to construct one from the Bazel context.
